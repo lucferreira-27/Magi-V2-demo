@@ -1,0 +1,18 @@
+version: '3'
+
+services:
+  manga-analyzer:
+    build: .
+    volumes:
+      - ./test_assets:/data/test_assets
+      - ./output:/data/output
+    environment:
+      - TEST_DIR=/data/test_assets
+      - OUTPUT_DIR=/data/output
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu] 

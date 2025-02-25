@@ -1,0 +1,34 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Docker
+.env
+
+venv
+
+# Project specific
+output/
+logs/
+test_assets/pages/*
+test_assets/characters/*
+!test_assets/pages/.gitkeep
+!test_assets/characters/.gitkeep

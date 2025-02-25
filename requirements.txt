@@ -1,0 +1,13 @@
+pillow
+numpy
+transformers
+torch>=2.0.0
+huggingface-hub
+einops>=0.6.0
+scipy>=1.10.0
+pulp>=2.7.0
+shapely
+matplotlib
+timm
+flask>=2.0.0
+werkzeug>=2.0.0
