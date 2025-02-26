@@ -1,4 +1,4 @@
-FROM pytorch/pytorch:2.0.0-cuda11.7-cudnn8-runtime
+FROM python:3.9-slim
 
 WORKDIR /app
 
@@ -6,22 +6,20 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y \
     libgl1-mesa-glx \
     libglib2.0-0 \
-    python3-pip \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements first to leverage Docker cache
+# Copy requirements and install Python dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy the application code
+# Copy application code
 COPY . .
 
-# Create directories for input/output
-RUN mkdir -p /data/test_assets/pages /data/test_assets/characters /data/output /app/logs
+# Create necessary directories
+RUN mkdir -p uploads test_assets/characters test_assets/pages
 
-# Set environment variables
-ENV TEST_DIR=/data/test_assets
-ENV OUTPUT_DIR=/data/output
+# Expose the port the app runs on
+EXPOSE 8080
 
-# Run the application
-ENTRYPOINT ["python", "main.py"] 
+# Command to run the application
+CMD ["python", "app.py"] 

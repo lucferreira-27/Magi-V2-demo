@@ -3,16 +3,19 @@ version: '3'
 services:
   manga-analyzer:
     build: .
+    ports:
+      - "8080:8080"
     volumes:
-      - ./test_assets:/data/test_assets
-      - ./output:/data/output
+      - ./test_assets:/app/test_assets
+      - manga_uploads:/app/uploads
     environment:
-      - TEST_DIR=/data/test_assets
-      - OUTPUT_DIR=/data/output
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu] 
+      - ANALYSIS_THRESHOLD=0.85
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  manga_uploads: 

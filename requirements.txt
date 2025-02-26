@@ -9,5 +9,5 @@ pulp>=2.7.0
 shapely
 matplotlib
 timm
-flask>=2.0.0
-werkzeug>=2.0.0
+flask==2.0.1
+werkzeug==2.0.1

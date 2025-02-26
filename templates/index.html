@@ -1,0 +1,1286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MangaAnalyzer</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        .character-card {
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .character-card.selected {
+            border-color: #0d6efd;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .character-image {
+            height: 200px;
+            object-fit: cover;
+            width: 100%;
+        }
+        .result-item {
+            margin-bottom: 20px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        .result-item:hover {
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .manga-page-card {
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .manga-page-card.selected {
+            border-color: #0d6efd;
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .manga-page-image {
+            height: 250px;
+            object-fit: cover;
+            width: 100%;
+        }
+        .selection-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background-color: #0d6efd;
+            color: white;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .no-items-message {
+            text-align: center;
+            padding: 40px;
+            color: #6c757d;
+        }
+        .confidence-high {
+            color: #198754;
+        }
+        .confidence-medium {
+            color: #fd7e14;
+        }
+        .confidence-low {
+            color: #dc3545;
+        }
+        .tab-content {
+            min-height: 400px;
+        }
+        .page-selector {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+        .animate-pulse {
+            animation: pulse 1.5s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .manga-canvas-container {
+            position: relative;
+            margin-bottom: 20px;
+            overflow: hidden;
+        }
+        
+        .manga-canvas {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            background-color: #f8f9fa;
+        }
+        
+        .manga-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none;
+        }
+        
+        .bbox-panel {
+            stroke: rgba(0, 180, 0, 0.8);
+            stroke-width: 2px;
+            fill: rgba(0, 180, 0, 0.1);
+        }
+        
+        .bbox-text {
+            stroke: rgba(0, 0, 200, 0.8);
+            stroke-width: 2px;
+            fill: rgba(0, 0, 200, 0.1);
+        }
+        
+        .bbox-character {
+            stroke: rgba(220, 0, 0, 0.8);
+            stroke-width: 2px;
+            fill: rgba(220, 0, 0, 0.1);
+        }
+        
+        .bbox-tail {
+            stroke: rgba(180, 180, 0, 0.8);
+            stroke-width: 2px;
+            fill: rgba(180, 180, 0, 0.1);
+        }
+        
+        .association-line {
+            stroke: rgba(100, 100, 255, 0.8);
+            stroke-width: 1.5px;
+            stroke-dasharray: 5,3;
+        }
+        
+        .character-label {
+            position: absolute;
+            background-color: rgba(220, 0, 0, 0.8);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 12px;
+            white-space: nowrap;
+            transform: translate(-50%, -100%);
+            margin-top: -5px;
+        }
+        
+        .visualization-controls {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        
+        .character-detail-card {
+            transition: all 0.3s ease;
+        }
+        
+        .character-detail-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        
+        .detection-stats {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1><i class="fas fa-book-open me-2"></i> MangaAnalyzer</h1>
+            <span id="statusIndicator" class="badge bg-success"><i class="fas fa-check-circle me-1"></i> Ready</span>
+        </div>
+        
+        <ul class="nav nav-tabs" id="myTab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="characters-tab" data-bs-toggle="tab" data-bs-target="#characters" type="button" role="tab">
+                    <i class="fas fa-user me-1"></i> Characters
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="manga-tab" data-bs-toggle="tab" data-bs-target="#manga" type="button" role="tab">
+                    <i class="fas fa-images me-1"></i> Manga Pages
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="analyze-tab" data-bs-toggle="tab" data-bs-target="#analyze" type="button" role="tab">
+                    <i class="fas fa-search me-1"></i> Analyze
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="results-tab" data-bs-toggle="tab" data-bs-target="#results" type="button" role="tab">
+                    <i class="fas fa-chart-bar me-1"></i> Results
+                </button>
+            </li>
+        </ul>
+        
+        <div class="tab-content p-3 border border-top-0 rounded-bottom" id="myTabContent">
+            <!-- Characters Tab -->
+            <div class="tab-pane fade show active" id="characters" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3><i class="fas fa-user me-2"></i> Character References</h3>
+                    <button class="btn btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#uploadCharacterCollapse">
+                        <i class="fas fa-plus me-1"></i> Add Character
+                    </button>
+                </div>
+                
+                <div class="collapse mb-4" id="uploadCharacterCollapse">
+                    <div class="card card-body">
+                    <h4>Upload New Character</h4>
+                    <form id="uploadCharacterForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                                <label for="characterFile" class="form-label">Character Image (Name will be extracted from filename)</label>
+                            <input class="form-control" type="file" id="characterFile" accept=".png,.jpg,.jpeg,.webp">
+                                <div class="form-text">Use descriptive filenames like "naruto.jpg" or "luffy.png"</div>
+                        </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-1"></i> Upload
+                            </button>
+                    </form>
+                    </div>
+                </div>
+                
+                <div id="characterSelectionInfo" class="alert alert-info d-none">
+                    <i class="fas fa-info-circle me-2"></i> Click on characters to select them for analysis
+                </div>
+                
+                <div id="characterList" class="row">
+                    <div class="no-items-message">
+                        <i class="fas fa-users fa-3x mb-3"></i>
+                        <h4>No characters available</h4>
+                        <p>Upload character reference images to get started</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Manga Pages Tab -->
+            <div class="tab-pane fade" id="manga" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h3><i class="fas fa-images me-2"></i> Manga Pages</h3>
+                    <button class="btn btn-outline-primary" data-bs-toggle="collapse" data-bs-target="#uploadMangaCollapse">
+                        <i class="fas fa-plus me-1"></i> Add Manga Page
+                    </button>
+                </div>
+                
+                <div class="collapse mb-4" id="uploadMangaCollapse">
+                    <div class="card card-body">
+                    <h4>Upload New Manga Page</h4>
+                    <form id="uploadMangaForm" enctype="multipart/form-data">
+                        <div class="mb-3">
+                            <label for="mangaFile" class="form-label">Manga Page</label>
+                            <input class="form-control" type="file" id="mangaFile" accept=".png,.jpg,.jpeg,.webp">
+                        </div>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-1"></i> Upload
+                            </button>
+                    </form>
+                    </div>
+                </div>
+                
+                <div id="pageSelectionInfo" class="alert alert-info d-none">
+                    <i class="fas fa-info-circle me-2"></i> Click on pages to select them for analysis
+                </div>
+                
+                <div id="pageList" class="row">
+                    <div class="no-items-message">
+                        <i class="fas fa-book fa-3x mb-3"></i>
+                        <h4>No manga pages available</h4>
+                        <p>Upload manga pages to get started</p>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analyze Tab -->
+            <div class="tab-pane fade" id="analyze" role="tabpanel">
+                <h3><i class="fas fa-search me-2"></i> Analyze Manga</h3>
+                
+                <div class="row mb-4 mt-4">
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5><i class="fas fa-users me-2"></i> Selected Characters</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="selectedCharacters" class="row g-2">
+                                    <div class="col-12 text-center text-muted">
+                                        <p>No characters selected</p>
+                                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="goToTab('characters')">
+                                            <i class="fas fa-user-plus me-1"></i> Select Characters
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card h-100">
+                            <div class="card-header">
+                                <h5><i class="fas fa-images me-2"></i> Selected Pages</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="selectedPages" class="row g-2">
+                                    <div class="col-12 text-center text-muted">
+                                        <p>No pages selected</p>
+                                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="goToTab('manga')">
+                                            <i class="fas fa-images me-1"></i> Select Pages
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid gap-2">
+                    <button id="analyzeBatchBtn" class="btn btn-lg btn-primary" disabled>
+                        <i class="fas fa-search me-2"></i> Analyze Selected Pages
+                    </button>
+                    <button id="analyzeAllBtn" class="btn btn-outline-secondary">
+                        <i class="fas fa-search-plus me-2"></i> Analyze All Pages with All Characters
+                    </button>
+                </div>
+                
+                <div class="mt-3">
+                    <div class="progress d-none" id="analysisProgress">
+                        <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Results Tab -->
+            <div class="tab-pane fade" id="results" role="tabpanel">
+                <h3 class="mb-3"><i class="fas fa-chart-bar me-2"></i> Analysis Results</h3>
+                
+                <div id="analysisProgress" class="progress mb-4 d-none">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                </div>
+                
+                <div class="alert alert-info d-none" id="noResultsMessage">
+                    <i class="fas fa-info-circle me-2"></i> No analysis results yet. Run an analysis from the Analyze tab.
+                </div>
+                
+                <div class="mb-4 d-none" id="resultsOverview">
+                    <div class="card">
+                        <div class="card-header bg-light">
+                            <h5 class="mb-0">Analysis Overview</h5>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-images fa-2x text-primary"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-0">Pages Analyzed</h6>
+                                            <span class="fs-4" id="overviewPagesCount">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-users fa-2x text-danger"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-0">Characters Detected</h6>
+                                            <span class="fs-4" id="overviewCharactersCount">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <div class="d-flex align-items-center">
+                                        <div class="flex-shrink-0">
+                                            <i class="fas fa-comment-dots fa-2x text-info"></i>
+                                        </div>
+                                        <div class="flex-grow-1 ms-3">
+                                            <h6 class="mb-0">Speech Bubbles</h6>
+                                            <span class="fs-4" id="overviewBubblesCount">0</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="resultsContainer"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global variables to track selected items
+        let selectedCharacters = [];
+        let selectedPages = [];
+        let allCharacters = [];
+        let allPages = [];
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCharacters();
+            loadPages();
+            
+            // Set up event listeners
+            document.getElementById('uploadCharacterForm').addEventListener('submit', uploadCharacter);
+            document.getElementById('uploadMangaForm').addEventListener('submit', uploadManga);
+            document.getElementById('analyzeBatchBtn').addEventListener('click', analyzeSelected);
+            document.getElementById('analyzeAllBtn').addEventListener('click', analyzeAll);
+            
+            // Update selected items displays when tabs are changed
+            document.getElementById('analyze-tab').addEventListener('click', updateSelectionDisplays);
+        });
+        
+        function updateAnalysisButtonState() {
+            const analyzeBtn = document.getElementById('analyzeBatchBtn');
+            if (selectedCharacters.length > 0 && selectedPages.length > 0) {
+                analyzeBtn.disabled = false;
+            } else {
+                analyzeBtn.disabled = true;
+            }
+        }
+        
+        function loadCharacters() {
+            setStatus('loading', 'Loading characters...');
+            
+            fetch('/api/characters')
+                .then(response => response.json())
+                .then(data => {
+                    allCharacters = data.characters;
+                    const characterList = document.getElementById('characterList');
+                    
+                    if (data.characters.length === 0) {
+                        characterList.innerHTML = `
+                            <div class="no-items-message">
+                                <i class="fas fa-users fa-3x mb-3"></i>
+                                <h4>No characters available</h4>
+                                <p>Upload character reference images to get started</p>
+                            </div>
+                        `;
+                        document.getElementById('characterSelectionInfo').classList.add('d-none');
+                    } else {
+                    characterList.innerHTML = '';
+                        document.getElementById('characterSelectionInfo').classList.remove('d-none');
+                    
+                    data.characters.forEach(character => {
+                        const col = document.createElement('div');
+                            col.className = 'col-md-3 col-sm-6';
+                        col.innerHTML = `
+                                <div class="card character-card" data-filename="${character.filename}">
+                                <img src="/images/character/${character.filename}" class="card-img-top character-image" alt="${character.name}">
+                                <div class="card-body">
+                                    <h5 class="card-title">${character.name}</h5>
+                                </div>
+                            </div>
+                        `;
+                        characterList.appendChild(col);
+                            
+                            // Add click event to select/deselect
+                            const card = col.querySelector('.card');
+                            card.addEventListener('click', function() {
+                                const filename = this.getAttribute('data-filename');
+                                toggleCharacterSelection(this, filename);
+                            });
+                        });
+                    }
+                    
+                    setStatus('ready', 'Ready');
+                })
+                .catch(error => {
+                    console.error('Error loading characters:', error);
+                    setStatus('error', 'Error loading characters');
+                });
+        }
+        
+        function loadPages() {
+            setStatus('loading', 'Loading manga pages...');
+            
+            fetch('/api/pages')
+                .then(response => response.json())
+                .then(data => {
+                    allPages = data.pages;
+                    const pageList = document.getElementById('pageList');
+                    
+                    if (data.pages.length === 0) {
+                        pageList.innerHTML = `
+                            <div class="no-items-message">
+                                <i class="fas fa-book fa-3x mb-3"></i>
+                                <h4>No manga pages available</h4>
+                                <p>Upload manga pages to get started</p>
+                            </div>
+                        `;
+                        document.getElementById('pageSelectionInfo').classList.add('d-none');
+                    } else {
+                        pageList.innerHTML = '';
+                        document.getElementById('pageSelectionInfo').classList.remove('d-none');
+                        
+                        data.pages.forEach(page => {
+                            const col = document.createElement('div');
+                            col.className = 'col-md-3 col-sm-6';
+                            col.innerHTML = `
+                                <div class="card manga-page-card" data-filename="${page.filename}">
+                                    <img src="/images/manga/${page.filename}" class="card-img-top manga-page-image" alt="${page.name}">
+                                    <div class="card-body">
+                                        <h5 class="card-title">${page.name}</h5>
+                                    </div>
+                                </div>
+                            `;
+                            pageList.appendChild(col);
+                            
+                            // Add click event to select/deselect
+                            const card = col.querySelector('.card');
+                            card.addEventListener('click', function() {
+                                const filename = this.getAttribute('data-filename');
+                                togglePageSelection(this, filename);
+                            });
+                        });
+                    }
+                    
+                    setStatus('ready', 'Ready');
+                })
+                .catch(error => {
+                    console.error('Error loading pages:', error);
+                    setStatus('error', 'Error loading pages');
+                });
+        }
+        
+        function toggleCharacterSelection(card, filename) {
+            const index = selectedCharacters.indexOf(filename);
+            
+            if (index === -1) {
+                // Add to selection
+                selectedCharacters.push(filename);
+                card.classList.add('selected');
+                
+                // Add selection badge if not exists
+                if (!card.querySelector('.selection-badge')) {
+                    const badge = document.createElement('div');
+                    badge.className = 'selection-badge';
+                    badge.innerHTML = '<i class="fas fa-check"></i>';
+                    card.appendChild(badge);
+                }
+            } else {
+                // Remove from selection
+                selectedCharacters.splice(index, 1);
+                card.classList.remove('selected');
+                
+                // Remove selection badge
+                const badge = card.querySelector('.selection-badge');
+                if (badge) {
+                    badge.remove();
+                }
+            }
+            
+            updateAnalysisButtonState();
+        }
+        
+        function togglePageSelection(card, filename) {
+            const index = selectedPages.indexOf(filename);
+            
+            if (index === -1) {
+                // Add to selection
+                selectedPages.push(filename);
+                card.classList.add('selected');
+                
+                // Add selection badge if not exists
+                if (!card.querySelector('.selection-badge')) {
+                    const badge = document.createElement('div');
+                    badge.className = 'selection-badge';
+                    badge.innerHTML = '<i class="fas fa-check"></i>';
+                    card.appendChild(badge);
+                }
+            } else {
+                // Remove from selection
+                selectedPages.splice(index, 1);
+                card.classList.remove('selected');
+                
+                // Remove selection badge
+                const badge = card.querySelector('.selection-badge');
+                if (badge) {
+                    badge.remove();
+                }
+            }
+            
+            updateAnalysisButtonState();
+        }
+        
+        function updateSelectionDisplays() {
+            // Update selected characters display
+            const selectedCharactersDiv = document.getElementById('selectedCharacters');
+            if (selectedCharacters.length === 0) {
+                selectedCharactersDiv.innerHTML = `
+                    <div class="col-12 text-center text-muted">
+                        <p>No characters selected</p>
+                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="goToTab('characters')">
+                            <i class="fas fa-user-plus me-1"></i> Select Characters
+                        </a>
+                    </div>
+                `;
+            } else {
+                selectedCharactersDiv.innerHTML = '';
+                selectedCharacters.forEach(filename => {
+                    const character = allCharacters.find(c => c.filename === filename);
+                    if (character) {
+                        const col = document.createElement('div');
+                        col.className = 'col-4';
+                        col.innerHTML = `
+                            <div class="card">
+                                <img src="/images/character/${character.filename}" class="card-img-top" alt="${character.name}" style="height: 100px; object-fit: cover;">
+                                <div class="card-body p-2 text-center">
+                                    <small>${character.name}</small>
+                                </div>
+                            </div>
+                        `;
+                        selectedCharactersDiv.appendChild(col);
+                    }
+                });
+            }
+            
+            // Update selected pages display
+            const selectedPagesDiv = document.getElementById('selectedPages');
+            if (selectedPages.length === 0) {
+                selectedPagesDiv.innerHTML = `
+                    <div class="col-12 text-center text-muted">
+                        <p>No pages selected</p>
+                        <a href="#" class="btn btn-sm btn-outline-primary" onclick="goToTab('manga')">
+                            <i class="fas fa-images me-1"></i> Select Pages
+                        </a>
+                    </div>
+                `;
+            } else {
+                selectedPagesDiv.innerHTML = '';
+                selectedPages.forEach(filename => {
+                    const page = allPages.find(p => p.filename === filename);
+                    if (page) {
+                        const col = document.createElement('div');
+                        col.className = 'col-4';
+                        col.innerHTML = `
+                            <div class="card">
+                                <img src="/images/manga/${page.filename}" class="card-img-top" alt="${page.name}" style="height: 100px; object-fit: cover;">
+                                <div class="card-body p-2 text-center">
+                                    <small>${page.name}</small>
+                                </div>
+                            </div>
+                        `;
+                        selectedPagesDiv.appendChild(col);
+                    }
+                });
+            }
+        }
+        
+        function uploadCharacter(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('characterFile');
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            setStatus('uploading', 'Uploading character...');
+            
+            fetch('/api/upload/character', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                setStatus('ready', 'Ready');
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                alert(data.message);
+                loadCharacters();
+                    // Clear the file input
+                fileInput.value = '';
+                    // Close the collapse
+                    const collapseElement = document.getElementById('uploadCharacterCollapse');
+                    const bsCollapse = new bootstrap.Collapse(collapseElement);
+                    bsCollapse.hide();
+                }
+            })
+            .catch(error => {
+                console.error('Error uploading character:', error);
+                setStatus('error', 'Upload failed');
+                alert('Error uploading character. Please try again.');
+            });
+        }
+        
+        function uploadManga(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('mangaFile');
+            if (!fileInput.files[0]) {
+                alert('Please select a file');
+                return;
+            }
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+            
+            setStatus('uploading', 'Uploading manga page...');
+            
+            fetch('/api/upload/manga', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                setStatus('ready', 'Ready');
+                if (data.error) {
+                    alert('Error: ' + data.error);
+                } else {
+                alert(data.message);
+                    loadPages();
+                    // Clear the file input
+                fileInput.value = '';
+                    // Close the collapse
+                    const collapseElement = document.getElementById('uploadMangaCollapse');
+                    const bsCollapse = new bootstrap.Collapse(collapseElement);
+                    bsCollapse.hide();
+                }
+            })
+            .catch(error => {
+                console.error('Error uploading manga page:', error);
+                setStatus('error', 'Upload failed');
+                alert('Error uploading manga page. Please try again.');
+            });
+        }
+        
+        function analyzeSelected() {
+            if (selectedCharacters.length === 0 || selectedPages.length === 0) {
+                alert('Please select at least one character and one page for analysis');
+                return;
+            }
+            
+            setStatus('analyzing', 'Analyzing selected pages...');
+            showProgressBar();
+            
+            fetch('/api/analyze/batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    selected_pages: selectedPages,
+                    selected_characters: selectedCharacters
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgressBar();
+                
+                if (data.error) {
+                    setStatus('error', 'Analysis failed');
+                    // Create a more detailed error modal
+                    showErrorModal('Analysis Error', data.error, data.detail);
+                    return;
+                }
+                
+                // Handle both completed and completed_with_errors states
+                if (data.status === 'completed' || data.status === 'completed_with_errors') {
+                    setStatus('ready', data.status === 'completed' ? 'Analysis complete' : 'Analysis complete with some errors');
+                    displayResults(data.results);
+                    goToTab('results');
+                } else {
+                    setStatus('error', 'Analysis failed');
+                    alert('Analysis failed: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                hideProgressBar();
+                console.error('Error during analysis:', error);
+                setStatus('error', 'Analysis failed');
+                alert('Analysis failed. See console for details.');
+            });
+        }
+        
+        function analyzeAll() {
+            setStatus('analyzing', 'Analyzing all pages with all characters...');
+            showProgressBar();
+            
+            fetch('/api/analyze/batch', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({}) // Empty object to use defaults (all pages, all characters)
+            })
+            .then(response => response.json())
+            .then(data => {
+                hideProgressBar();
+                setStatus('ready', 'Analysis complete');
+                
+                if (data.status === 'completed') {
+                    displayResults(data.results);
+                    goToTab('results');
+                } else {
+                    alert('Analysis failed: ' + data.error);
+                }
+            })
+            .catch(error => {
+                hideProgressBar();
+                console.error('Error during analysis:', error);
+                setStatus('error', 'Analysis failed');
+                alert('Analysis failed. See console for details.');
+            });
+        }
+        
+        function displayResults(results) {
+            const container = document.getElementById('resultsContainer');
+            const noResultsMessage = document.getElementById('noResultsMessage');
+            const resultsOverview = document.getElementById('resultsOverview');
+            
+            // Hide the no results message
+            noResultsMessage.classList.add('d-none');
+            
+            container.innerHTML = '';
+            
+            // Check if we have any errors
+            if (results.errors && results.errors.length > 0) {
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'alert alert-warning';
+                errorDiv.innerHTML = `
+                    <h4><i class="fas fa-exclamation-triangle me-2"></i>Some pages had errors</h4>
+                    <p>The following errors occurred during analysis:</p>
+                    <ul class="mb-0">
+                        ${results.errors.map(err => `<li>${err}</li>`).join('')}
+                    </ul>
+                `;
+                container.appendChild(errorDiv);
+            }
+            
+            if (results.length === 0) {
+                noResultsMessage.classList.remove('d-none');
+                resultsOverview.classList.add('d-none');
+                return;
+            }
+            
+            // Update overview stats
+            resultsOverview.classList.remove('d-none');
+            document.getElementById('overviewPagesCount').textContent = results.length;
+            
+            let totalCharacters = 0;
+            let totalBubbles = 0;
+            
+            // Process each page result
+            results.forEach((pageResult, index) => {
+                const pageDiv = document.createElement('div');
+                pageDiv.className = 'result-item mb-4';
+                
+                // Count characters and bubbles for overview
+                const charactersCount = pageResult.characters?.length || 0;
+                const bubblesCount = pageResult.texts?.length || 0;
+                totalCharacters += charactersCount;
+                totalBubbles += bubblesCount;
+                
+                // Create tabs for this page result
+                const pageId = `page-${index}`;
+                const tabId = `tabs-${pageId}`;
+                
+                pageDiv.innerHTML = `
+                    <h4 class="mb-3">
+                        <i class="fas fa-file-image me-2"></i> ${pageResult.manga_page}
+                    </h4>
+                    
+                    <ul class="nav nav-tabs" id="${tabId}-nav" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="${tabId}-visualization-tab" data-bs-toggle="tab" 
+                                data-bs-target="#${tabId}-visualization" type="button" role="tab">
+                                <i class="fas fa-eye me-1"></i> Visualization
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="${tabId}-characters-tab" data-bs-toggle="tab" 
+                                data-bs-target="#${tabId}-characters" type="button" role="tab">
+                                <i class="fas fa-users me-1"></i> Characters (${charactersCount})
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="${tabId}-details-tab" data-bs-toggle="tab" 
+                                data-bs-target="#${tabId}-details" type="button" role="tab">
+                                <i class="fas fa-info-circle me-1"></i> Raw Data
+                            </button>
+                        </li>
+                    </ul>
+                    
+                    <div class="tab-content border border-top-0 p-3 rounded-bottom" id="${tabId}-content">
+                        <div class="tab-pane fade show active" id="${tabId}-visualization" role="tabpanel">
+                            <div class="visualization-controls">
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="${pageId}-show-panels" checked>
+                                    <label class="form-check-label" for="${pageId}-show-panels">
+                                        <span class="badge bg-success">Panels</span>
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="${pageId}-show-texts" checked>
+                                    <label class="form-check-label" for="${pageId}-show-texts">
+                                        <span class="badge bg-primary">Text Bubbles</span>
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="${pageId}-show-characters" checked>
+                                    <label class="form-check-label" for="${pageId}-show-characters">
+                                        <span class="badge bg-danger">Characters</span>
+                                    </label>
+                                </div>
+                                <div class="form-check form-check-inline">
+                                    <input class="form-check-input" type="checkbox" id="${pageId}-show-associations" checked>
+                                    <label class="form-check-label" for="${pageId}-show-associations">
+                                        <span class="badge bg-info">Associations</span>
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div class="manga-canvas-container" id="${pageId}-canvas-container">
+                                <img src="/images/manga/${pageResult.manga_page}" class="img-fluid manga-canvas" 
+                                    id="${pageId}-image" onload="drawOverlay('${pageId}', ${JSON.stringify(pageResult).replace(/"/g, '&quot;')})">
+                                <svg class="manga-overlay" id="${pageId}-overlay"></svg>
+                                <div id="${pageId}-labels"></div>
+                            </div>
+                            
+                            <div class="detection-stats small text-muted mt-2">
+                                <div><strong>Panels:</strong> ${pageResult.panels?.length || 0}</div>
+                                <div><strong>Text Bubbles:</strong> ${pageResult.texts?.length || 0}</div>
+                                <div><strong>Characters:</strong> ${pageResult.characters?.length || 0}</div>
+                                <div><strong>Associations:</strong> ${pageResult.text_character_associations?.length || 0}</div>
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="${tabId}-characters" role="tabpanel">
+                            <div class="row" id="${pageId}-characters-container">
+                                ${renderCharactersContent(pageResult)}
+                            </div>
+                        </div>
+                        
+                        <div class="tab-pane fade" id="${tabId}-details" role="tabpanel">
+                            <pre class="bg-light p-3 mt-3">${JSON.stringify(pageResult, null, 2)}</pre>
+                        </div>
+                    </div>
+                `;
+                
+                container.appendChild(pageDiv);
+            });
+            
+            // Update overview counts
+            document.getElementById('overviewCharactersCount').textContent = totalCharacters;
+            document.getElementById('overviewBubblesCount').textContent = totalBubbles;
+        }
+        
+        function renderCharactersContent(pageResult) {
+            if (!pageResult.characters || pageResult.characters.length === 0) {
+                return `
+                    <div class="col-12">
+                        <div class="alert alert-info">
+                            <i class="fas fa-info-circle me-2"></i> No characters detected in this page.
+                        </div>
+                    </div>
+                `;
+            }
+            
+            return pageResult.characters.map((character, index) => {
+                const confidencePercent = Math.round(character.confidence * 100);
+                const confidenceClass = confidencePercent > 85 ? 'success' : 
+                                    confidencePercent > 70 ? 'warning' : 'danger';
+                
+                return `
+                    <div class="col-md-4 mb-4">
+                        <div class="card character-detail-card h-100">
+                            <div class="card-header bg-light">
+                                <h5 class="mb-0 text-center">${character.character}</h5>
+                            </div>
+                            <div class="card-body">
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        ${character.reference && character.reference.filename ? 
+                                          `<img src="/images/character/${character.reference.filename}" 
+                                           class="img-fluid rounded" alt="${character.character}">` : 
+                                          `<div class="p-4 text-center text-muted bg-light rounded">
+                                              <i class="fas fa-user fa-4x"></i>
+                                              <p class="mt-2">No reference image</p>
+                                           </div>`
+                                        }
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-2">
+                                            <strong>Confidence:</strong>
+                                            <div class="progress">
+                                                <div class="progress-bar bg-${confidenceClass}" 
+                                                    style="width: ${confidencePercent}%" 
+                                                    aria-valuenow="${confidencePercent}" aria-valuemin="0" aria-valuemax="100">
+                                                    ${confidencePercent}%
+                                                </div>
+                                            </div>
+                                        </div>
+                                        ${character.occurrences ? 
+                                          `<div class="mb-2">
+                                              <strong>Occurrences:</strong> ${character.occurrences}
+                                           </div>` : ''
+                                        }
+                                        ${character.bbox ? 
+                                          `<div class="mb-2">
+                                              <strong>Position:</strong><br>
+                                              <small>x: ${Math.round(character.bbox[0])} - ${Math.round(character.bbox[2])}<br>
+                                              y: ${Math.round(character.bbox[1])} - ${Math.round(character.bbox[3])}</small>
+                                           </div>` : ''
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function drawOverlay(pageId, pageResult) {
+            // Get the image and overlay elements
+            const imgElement = document.getElementById(`${pageId}-image`);
+            const overlayElement = document.getElementById(`${pageId}-overlay`);
+            const labelsContainer = document.getElementById(`${pageId}-labels`);
+            const canvasContainer = document.getElementById(`${pageId}-canvas-container`);
+            
+            // Set the SVG dimensions to match the image
+            const imgWidth = imgElement.width;
+            const imgHeight = imgElement.height;
+            overlayElement.setAttribute('width', imgWidth);
+            overlayElement.setAttribute('height', imgHeight);
+            
+            // Scale factor for bounding boxes (original coords to displayed image size)
+            const originalWidth = imgElement.naturalWidth;
+            const originalHeight = imgElement.naturalHeight;
+            const scaleX = imgWidth / originalWidth;
+            const scaleY = imgHeight / originalHeight;
+            
+            // Clear existing content
+            overlayElement.innerHTML = '';
+            labelsContainer.innerHTML = '';
+            
+            // Function to scale coordinates
+            const scaleCoords = coords => [
+                coords[0] * scaleX, coords[1] * scaleY, 
+                coords[2] * scaleX, coords[3] * scaleY
+            ];
+            
+            // Draw panels if enabled
+            if (document.getElementById(`${pageId}-show-panels`).checked && pageResult.panels) {
+                pageResult.panels.forEach(panel => {
+                    const [x1, y1, x2, y2] = scaleCoords(panel);
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', x1);
+                    rect.setAttribute('y', y1);
+                    rect.setAttribute('width', x2 - x1);
+                    rect.setAttribute('height', y2 - y1);
+                    rect.setAttribute('class', 'bbox-panel');
+                    overlayElement.appendChild(rect);
+                });
+            }
+            
+            // Draw text bubbles if enabled
+            if (document.getElementById(`${pageId}-show-texts`).checked && pageResult.texts) {
+                pageResult.texts.forEach((text, index) => {
+                    const [x1, y1, x2, y2] = scaleCoords(text);
+                    const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                    rect.setAttribute('x', x1);
+                    rect.setAttribute('y', y1);
+                    rect.setAttribute('width', x2 - x1);
+                    rect.setAttribute('height', y2 - y1);
+                    rect.setAttribute('class', 'bbox-text');
+                    rect.setAttribute('data-text-index', index);
+                    overlayElement.appendChild(rect);
+                });
+            }
+            
+            // Draw characters if enabled
+            if (document.getElementById(`${pageId}-show-characters`).checked) {
+                // First draw raw character boxes
+                if (pageResult.raw_character_data && pageResult.raw_character_data.character_bboxes) {
+                    pageResult.raw_character_data.character_bboxes.forEach((char, index) => {
+                        const [x1, y1, x2, y2] = scaleCoords(char);
+                        const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                        rect.setAttribute('x', x1);
+                        rect.setAttribute('y', y1);
+                        rect.setAttribute('width', x2 - x1);
+                        rect.setAttribute('height', y2 - y1);
+                        rect.setAttribute('class', 'bbox-character');
+                        rect.setAttribute('data-character-index', index);
+                        overlayElement.appendChild(rect);
+                        
+                        // Add character name label if available
+                        if (pageResult.raw_character_data.character_names && 
+                            pageResult.raw_character_data.character_names[index] &&
+                            pageResult.raw_character_data.character_names[index] !== "Other") {
+                            const label = document.createElement('div');
+                            label.className = 'character-label';
+                            label.textContent = pageResult.raw_character_data.character_names[index];
+                            label.style.left = `${(x1 + x2) / 2}px`;
+                            label.style.top = `${y1}px`;
+                            labelsContainer.appendChild(label);
+                        }
+                    });
+                }
+                
+                // Then draw detected characters (might be a subset with additional info)
+                if (pageResult.characters) {
+                    pageResult.characters.forEach(char => {
+                        if (char.bbox) {
+                            const [x1, y1, x2, y2] = scaleCoords(char.bbox);
+                            // Highlight detected characters with a stroke
+                            const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+                            rect.setAttribute('x', x1);
+                            rect.setAttribute('y', y1);
+                            rect.setAttribute('width', x2 - x1);
+                            rect.setAttribute('height', y2 - y1);
+                            rect.setAttribute('stroke', 'yellow');
+                            rect.setAttribute('stroke-width', '3');
+                            rect.setAttribute('fill', 'none');
+                            overlayElement.appendChild(rect);
+                        }
+                    });
+                }
+            }
+            
+            // Draw associations if enabled
+            if (document.getElementById(`${pageId}-show-associations`).checked && 
+                pageResult.text_character_associations &&
+                pageResult.texts &&
+                pageResult.raw_character_data &&
+                pageResult.raw_character_data.character_bboxes) {
+                
+                pageResult.text_character_associations.forEach(assoc => {
+                    const textIdx = assoc[0];
+                    const charIdx = assoc[1];
+                    
+                    if (textIdx < pageResult.texts.length && 
+                        charIdx < pageResult.raw_character_data.character_bboxes.length) {
+                        
+                        const textBox = scaleCoords(pageResult.texts[textIdx]);
+                        const charBox = scaleCoords(pageResult.raw_character_data.character_bboxes[charIdx]);
+                        
+                        // Calculate center points
+                        const textCenterX = (textBox[0] + textBox[2]) / 2;
+                        const textCenterY = (textBox[1] + textBox[3]) / 2;
+                        const charCenterX = (charBox[0] + charBox[2]) / 2;
+                        const charCenterY = (charBox[1] + charBox[3]) / 2;
+                        
+                        // Draw a line connecting text and character
+                        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                        line.setAttribute('x1', textCenterX);
+                        line.setAttribute('y1', textCenterY);
+                        line.setAttribute('x2', charCenterX);
+                        line.setAttribute('y2', charCenterY);
+                        line.setAttribute('class', 'association-line');
+                        overlayElement.appendChild(line);
+                    }
+                });
+            }
+            
+            // Add event listeners for visibility toggles
+            document.getElementById(`${pageId}-show-panels`).addEventListener('change', 
+                () => drawOverlay(pageId, pageResult));
+            document.getElementById(`${pageId}-show-texts`).addEventListener('change', 
+                () => drawOverlay(pageId, pageResult));
+            document.getElementById(`${pageId}-show-characters`).addEventListener('change', 
+                () => drawOverlay(pageId, pageResult));
+            document.getElementById(`${pageId}-show-associations`).addEventListener('change', 
+                () => drawOverlay(pageId, pageResult));
+        }
+        
+        function setStatus(state, message) {
+            const statusIndicator = document.getElementById('statusIndicator');
+            
+            switch(state) {
+                case 'loading':
+                    statusIndicator.className = 'badge bg-info animate-pulse';
+                    statusIndicator.innerHTML = `<i class="fas fa-sync-alt me-1"></i> ${message}`;
+                    break;
+                case 'uploading':
+                    statusIndicator.className = 'badge bg-info animate-pulse';
+                    statusIndicator.innerHTML = `<i class="fas fa-upload me-1"></i> ${message}`;
+                    break;
+                case 'analyzing':
+                    statusIndicator.className = 'badge bg-warning animate-pulse';
+                    statusIndicator.innerHTML = `<i class="fas fa-brain me-1"></i> ${message}`;
+                    break;
+                case 'ready':
+                    statusIndicator.className = 'badge bg-success';
+                    statusIndicator.innerHTML = `<i class="fas fa-check-circle me-1"></i> ${message}`;
+                    break;
+                case 'error':
+                    statusIndicator.className = 'badge bg-danger';
+                    statusIndicator.innerHTML = `<i class="fas fa-exclamation-circle me-1"></i> ${message}`;
+                    break;
+                default:
+                    statusIndicator.className = 'badge bg-secondary';
+                    statusIndicator.innerHTML = `<i class="fas fa-info-circle me-1"></i> ${message}`;
+            }
+        }
+        
+        function showProgressBar() {
+            document.getElementById('analysisProgress').classList.remove('d-none');
+        }
+        
+        function hideProgressBar() {
+            document.getElementById('analysisProgress').classList.add('d-none');
+        }
+        
+        function goToTab(tabName) {
+            const tab = document.getElementById(`${tabName}-tab`);
+            const tabInstance = new bootstrap.Tab(tab);
+            tabInstance.show();
+        }
+        
+        // Add a function to show detailed error modals
+        function showErrorModal(title, error, detail) {
+            // Create a modal element if it doesn't exist
+            let modalEl = document.getElementById('errorModal');
+            if (!modalEl) {
+                const modalHtml = `
+                    <div class="modal fade" id="errorModal" tabindex="-1" aria-hidden="true">
+                        <div class="modal-dialog modal-lg">
+                            <div class="modal-content">
+                                <div class="modal-header bg-danger text-white">
+                                    <h5 class="modal-title"><i class="fas fa-exclamation-circle me-2"></i><span id="errorModalTitle"></span></h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <p id="errorModalMessage"></p>
+                                    <div class="accordion" id="errorDetailAccordion">
+                                        <div class="accordion-item">
+                                            <h2 class="accordion-header" id="errorDetailHeading">
+                                                <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" 
+                                                        data-bs-target="#errorDetailCollapse" aria-expanded="false">
+                                                    Technical Details
+                                                </button>
+                                            </h2>
+                                            <div id="errorDetailCollapse" class="accordion-collapse collapse" aria-labelledby="errorDetailHeading">
+                                                <div class="accordion-body">
+                                                    <pre id="errorModalDetail" class="bg-light p-3"></pre>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="modal-footer">
+                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                modalEl = document.getElementById('errorModal');
+            }
+            
+            // Set the modal content
+            document.getElementById('errorModalTitle').textContent = title;
+            document.getElementById('errorModalMessage').textContent = error;
+            
+            if (detail) {
+                document.getElementById('errorModalDetail').textContent = detail;
+                document.getElementById('errorDetailAccordion').style.display = 'block';
+            } else {
+                document.getElementById('errorDetailAccordion').style.display = 'none';
+            }
+            
+            // Show the modal
+            const modal = new bootstrap.Modal(modalEl);
+            modal.show();
+        }
+    </script>
+</body>
+</html> 
